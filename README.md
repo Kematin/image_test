@@ -8,11 +8,18 @@ source venv/bin/activate
 pip install -r req.txt
 python parse/main.py
 ```
+Schema:
 
 ![schema](examples/schema.png)
 
+Upload to s3 example:
+
 ![load](examples/load.gif)
 
+Websocket connection example:
+
 ![term](examples/term.gif)
+
+Bucket:
 
 ![Bucket](examples/bucket.png)
