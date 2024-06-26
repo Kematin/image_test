@@ -1,0 +1,20 @@
+services:
+  parse_images:
+    build: .
+    image: parse:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - parse/.env
+  
+  database:
+    image: mongo
+    ports:
+      - "27017"
+    volumes:
+      - data:/data/db
+    env_file:
+      - parse/.env
+
+volumes:
+  data:
