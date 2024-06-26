@@ -1,3 +1,4 @@
+
 services:
   parse_images:
     build: .
@@ -6,13 +7,15 @@ services:
       - "8000:8000"
     env_file:
       - parse/.env
+    depends_on:
+      - database
   
   database:
     image: mongo
     ports:
-      - "27017"
+      - "27017:27017"
     volumes:
-      - data:/data/db
+      - data:/store
     env_file:
       - parse/.env
 

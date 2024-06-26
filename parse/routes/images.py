@@ -51,7 +51,7 @@ async def upload_image(
     downloand_link = f"{config.HOST_URL}/images/{image_doc.id}"
     image_response = image_doc.model_dump()
     image_response["download_link"] = downloand_link
-    return JSONResponse({"image": image_response})
+    return JSONResponse({"image": image_response}, status_code=status.HTTP_201_CREATED)
 
 
 @router.get("/{id}")

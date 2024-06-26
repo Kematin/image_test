@@ -76,5 +76,5 @@ async def retieve_images_status(*, websocket: WebSocket, id: PydanticObjectId):
             await websocket_manager.send_images_uploaded(websocket, id)
             await websocket.receive_text()
     except WebSocketDisconnect:
-        websocket_manager.disconnect(id, websocket)
+        await websocket_manager.disconnect(id, websocket)
         logging.info("client disconnected")

@@ -20,7 +20,7 @@ class WebSocketManager:
         self.active_connections[project_id].append(websocket)
         await websocket.accept()
 
-    def disconnect(self, project_id: PydanticObjectId, websocket: WebSocket):
+    async def disconnect(self, project_id: PydanticObjectId, websocket: WebSocket):
         self.active_connections[project_id].remove(websocket)
         if not self.active_connections[project_id]:
             del self.active_connections[project_id]

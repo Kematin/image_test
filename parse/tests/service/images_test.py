@@ -2,27 +2,52 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from beanie import PydanticObjectId
-from exceptions import UniqueException
+from config import Settings
 from fastapi import UploadFile
 from models import Image
 from responses.s3_response import S3Stream
 from service.images import ImagesWorker
 
 
+async def init_db():
+    test_settings = Settings()
+    test_settings.DATABASE_URL = "mongodb://localhost:27017/testdb"
+    test_settings.BUCKET_NAME = "bucket3test"
+    await test_settings.initialize_database()
+
+
 class TestImagesWorker:
+    @pytest.fixture()
+    async def client(self):
+        await init_db()
+        yield
+        await Image.find_all().delete()
+
     @pytest.fixture
     def images_worker(self) -> ImagesWorker:
         return ImagesWorker(bucket="buckets3test")
 
-    @pytest.mark.asyncio
-    async def test_check_unique_path(self, images_worker: ImagesWorker):
-        with patch.object(Image, "find_one", return_value=None):
-            result = await images_worker._ImagesWorker__check_unique_path("unique/path")
-            assert result is True
+    @pytest.fixture
+    async def image(self) -> Image:
+        data = {
+            "path": "test/test.png",
+            "project_id": PydanticObjectId(),
+            "filename": "test.png",
+        }
+        image = Image(**data)
+        await image.create()
+        return image
 
-        with patch.object(Image, "find_one", return_value=Image(path="unique/path")):
-            result = await images_worker._ImagesWorker__check_unique_path("unique/path")
-            assert result is False
+    @pytest.mark.asyncio
+    async def test_check_unique_path(
+        self, client, image: Image, images_worker: ImagesWorker
+    ):
+        unique = await images_worker._ImagesWorker__check_unique_path("unique/path")
+        not_unique = await images_worker._ImagesWorker__check_unique_path(
+            "test/test.png"
+        )
+        assert unique is True
+        assert not_unique is False
 
     @pytest.mark.asyncio
     async def test_send_socket_message(self, images_worker: ImagesWorker):
@@ -41,33 +66,19 @@ class TestImagesWorker:
             assert args[1].state == state
 
     @pytest.mark.asyncio
-    async def test_upload_image_success(self, images_worker: ImagesWorker):
-        with patch.object(Image, "find_one", return_value=None):
-            s3_mock = AsyncMock()
-            upload_file_mock = AsyncMock(spec=UploadFile)
-            upload_file_mock.filename = "test.png"
-            upload_file_mock.read = AsyncMock(return_value=b"file bytes")
+    async def test_upload_image_success(
+        self, client, image: Image, images_worker: ImagesWorker
+    ):
+        s3_mock = AsyncMock()
+        upload_file_mock = AsyncMock(spec=UploadFile)
+        upload_file_mock.filename = "test.png"
+        upload_file_mock.read = AsyncMock(return_value=b"file bytes")
 
-            project_id = PydanticObjectId()
-            result = await images_worker.upload_image(
-                s3_mock, upload_file_mock, project_id
-            )
+        result = await images_worker.upload_image(
+            s3_mock, upload_file_mock, image.project_id
+        )
 
-            assert result == f"images/{project_id}/test.png"
-
-    @pytest.mark.asyncio
-    async def test_upload_image_non_unique_path(self, images_worker: ImagesWorker):
-        with patch.object(
-            Image, "find_one", return_value=Image(path="images/project_id/test.png")
-        ):
-            with pytest.raises(UniqueException):
-                s3_mock = AsyncMock()
-                upload_file_mock = AsyncMock(spec=UploadFile)
-                upload_file_mock.filename = "test.png"
-                upload_file_mock.read = AsyncMock(return_value=b"file bytes")
-
-                project_id = PydanticObjectId()
-                await images_worker.upload_image(s3_mock, upload_file_mock, project_id)
+        assert result == f"images/{image.project_id}/test.png"
 
     @pytest.mark.asyncio
     async def test_download_image_response(self, images_worker: ImagesWorker):
@@ -81,4 +92,4 @@ class TestImagesWorker:
 
         assert isinstance(result, S3Stream)
         assert result.Bucket == images_worker.bucket
-        assert result.Key == "images/project_id/test.png"
+        assert result.Key == f"images/{project_id}/test.png"
